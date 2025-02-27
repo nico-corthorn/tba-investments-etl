@@ -6,7 +6,7 @@ def read_requirements(filename):
 
 setup(
     name="tba_invest_etl",
-    version="0.0.1",
+    version="0.0.2",
     packages=find_packages(include=['tba_invest_etl*']),  # Explicitly include all tba_invest_etl subpackages
     package_data={'tba_invest_etl': ['**/*']},  # Include all files in the package
     include_package_data=True,

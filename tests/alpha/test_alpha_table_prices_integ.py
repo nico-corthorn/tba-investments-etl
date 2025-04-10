@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from tba_invest_etl.alpha import api, table
+from tbainvestetl.alpha import api, table
 
 
 @pytest.mark.integration

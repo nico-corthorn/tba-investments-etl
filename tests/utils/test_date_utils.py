@@ -3,7 +3,7 @@ import datetime
 import pytest
 from pytz import timezone
 
-from tba_invest_etl.utils import date_utils
+from tbainvestetl.utils import date_utils
 
 tz = timezone("US/Pacific")
 

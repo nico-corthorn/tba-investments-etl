@@ -1,0 +1,210 @@
+
+
+from datetime import datetime
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from dateutil.relativedelta import relativedelta
+
+
+def create_tables(sql):
+
+        # reg_fit
+        query = """
+        CREATE TABLE IF NOT EXISTS reg_fit
+        (
+            permno int NOT NULL,
+            date timestamp without time zone NOT NULL,
+            ticker varchar(20),
+            fitted_return float,
+            residual float,
+            PRIMARY KEY (permno, date)
+        );
+    
+        CREATE INDEX IF NOT EXISTS reg_fit_idx_date ON reg_fit(date);
+    
+        """
+        sql.query(query)
+
+        # reg_specific_vol
+        query = """
+            CREATE TABLE IF NOT EXISTS reg_specific_vol
+            (
+                permno int NOT NULL,
+                date timestamp without time zone NOT NULL,
+                specific_vol float,
+                PRIMARY KEY (permno, date)
+            );
+        
+            CREATE INDEX IF NOT EXISTS reg_specific_vol_idx_date ON reg_specific_vol(date);
+        
+            """
+        sql.query(query)
+
+        # reg_cov_rho
+        query = """
+        CREATE TABLE IF NOT EXISTS reg_cov_rho
+        (
+            date timestamp without time zone NOT NULL,
+            factor1 varchar(50) NOT NULL,
+            factor2 varchar(50) NOT NULL,
+            cov float NOT NULL,
+            rho float NOT NULL,
+            PRIMARY KEY (date, factor1, factor2)
+        );
+        
+        CREATE INDEX IF NOT EXISTS reg_cov_rho_idx_date ON reg_cov_rho(date);
+        
+        """
+        sql.query(query)
+
+
+def compute_fitted_return_and_residual_date(eom_date, ret_factors_sc, reg_coefs, sql, upload=False):
+    # Retrieve returns and scaled factor exposures
+    factors = ['beta', 'bm', 'small', 'mom', 'lowvol']
+    ret_date = ret_factors_sc.loc[
+        ret_factors_sc.date == eom_date, ['permno', 'date', 'ticker', 'logret_1m'] + factors].set_index('permno')
+
+    # Retrieve factor returns and match names and order
+    coef_date = reg_coefs.loc[reg_coefs.date == date, ['factor', 'coef']]
+    coef_map = {coef: coef for coef in coef_date.factor}
+    coef_map['size'] = 'small'
+    coef_map['vol'] = 'lowvol'
+    coef_date['factor'] = coef_date.factor.map(coef_map)
+    coef_date = coef_date.set_index('factor')
+    coef_date = coef_date.loc[factors]
+
+    # Compute fitted return and residual (also specific or idyosincratic return)
+    ret_date['fitted_return'] = ret_date[factors] @ coef_date.coef
+    ret_date['residual'] = ret_date['logret_1m'] - ret_date['fitted_return']
+    ret_date = ret_date.reset_index()
+
+    # Upload
+    if upload:
+        sql.upload_df_chunks('reg_fit', ret_date[['permno', 'date', 'ticker', 'fitted_return', 'residual']],
+                             chunk_size=100)
+
+    return ret_date
+
+
+def upload_fitted_return_and_residual(sql, clean_table=True):
+
+    # Clean table
+    if clean_table:
+        sql.clean_table('reg_fit')
+
+    # Dates
+    query = f"select distinct date from crsp_monthly_returns_factors_sc"
+    eom_dates = sql.select_query(query).sort_values(by='date').reset_index(drop=True).date
+
+    # Retrieve returns, factor_exposures and factor_returns
+    ret_factors_sc = sql.select_query('select * from crsp_monthly_returns_factors_sc')
+    reg_coefs = sql.select_query('select * from reg_coefs')
+
+    # Compute date by date
+    for eom_date in eom_dates:
+        print(eom_date, end="\r")
+        compute_fitted_return_and_residual_date(eom_date, ret_factors_sc, reg_coefs, sql, upload=True)
+
+
+def compute_vol_date(eom_date, sql, upload=False):
+    # Get data for the date
+    date_str = eom_date.strftime('%Y-%m-%d')
+    query = f"select * from reg_fit where date = '{date_str}'"
+    reg_fit = sql.select_query(query)
+
+    # Fetch past 5 years of specific returns (residuals) for all stocks at eom_date
+    date_5y = eom_date - relativedelta(years=5)
+    date_5y_str = date_5y.strftime('%Y-%m-%d')
+
+    query = rf"""
+    select * from reg_fit 
+    where date between '{date_5y_str}' and '{date_str}'
+          and permno in ({','.join([str(permno) for permno in reg_fit.permno])})
+    """
+    reg_fit_past = sql.select_query(query)
+
+    # Compute vol and demand enough data for computation
+    df_vol = reg_fit_past.groupby(['permno'])[['residual']].agg({'residual': [np.std, len]})
+    df_vol.columns = df_vol.columns.droplevel()
+    df_vol.loc[df_vol.len < 45, 'std'] = np.nan
+    df_vol = df_vol[['std']].reset_index().rename(columns={'std': 'specific_vol'})
+    df_vol['date'] = eom_date
+    df_vol = df_vol[['permno', 'date', 'specific_vol']]
+
+    # Upload
+    if upload:
+        sql.upload_df_chunks('reg_specific_vol', df_vol, chunk_size=100)
+
+    return df_vol
+
+
+def upload_specific_vol(sql, clean_table=True):
+
+    # Clean table
+    if clean_table:
+        sql.clean_table('reg_specific_vol')
+
+    # Dates
+    query = f"select distinct date from reg_fit"
+    eom_dates = sql.select_query(query).sort_values(by='date').reset_index(drop=True).date
+    eom_dates = eom_dates[eom_dates >= eom_dates.min() + relativedelta(years=5)]
+
+    # Compute date by date
+    for eom_date in eom_dates:
+        print(eom_date, end="\r")
+        compute_vol_date(eom_date, sql, upload=True)
+
+
+def melt_factor_table(factor_table, col_name):
+    table_unpiv = \
+        (factor_table
+            .reset_index()
+            .rename(columns={'factor': 'factor1'})
+            .melt(id_vars='factor1', value_name=col_name)
+            .rename(columns={'factor': 'factor2'}))
+    return table_unpiv.set_index(['factor1', 'factor2'])
+
+
+def compute_cov_rho_date(eom_date, reg_coefs, sql, upload=False):
+    # Filter last 5 years
+    date_5y = eom_date - relativedelta(years=5)
+    date_5y_str = date_5y.strftime('%Y-%m-%d')
+    reg_date = reg_coefs.loc[(reg_coefs.date <= eom_date) & (reg_coefs.date >= date_5y)]
+
+    if reg_date.shape[0] > 5 * 12:
+        # Compute covariance and correlation matrix (cov and rho)
+        reg_piv = reg_date.pivot_table(index='date', columns='factor', values='coef')
+        reg_cov = reg_piv.cov()
+        reg_rho = reg_piv.corr()
+        cov_unpiv = melt_factor_table(reg_cov, 'cov')
+        rho_unpiv = melt_factor_table(reg_rho, 'rho')
+        cov_rho = cov_unpiv.join(rho_unpiv).reset_index()
+        cov_rho['date'] = eom_date
+        cov_rho = cov_rho[['date', 'factor1', 'factor2', 'cov', 'rho']]
+
+        if upload:
+            sql.upload_df_chunks('reg_cov_rho', cov_rho, chunk_size=100)
+
+    return cov_rho
+
+
+def upload_cov_rho(sql, clean_table=True):
+    # Clean table
+    if clean_table:
+        sql.clean_table('reg_cov_rho')
+
+    # Dates
+    query = f"select distinct date from reg_coefs"
+    eom_dates = sql.select_query(query).sort_values(by='date').reset_index(drop=True).date
+    eom_dates = eom_dates[eom_dates >= eom_dates.min() + relativedelta(years=5)]
+
+    # Retrieve factor returns
+    reg_coefs = sql.select_query('select * from reg_coefs')
+
+    # Compute date by date
+    for eom_date in eom_dates:
+        print(eom_date, end="\r")
+        compute_cov_rho_date(eom_date, reg_coefs, sql, upload=True)

@@ -4,9 +4,9 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 
-from tba_invest_etl.alpha.api import AlphaScraper
-from tba_invest_etl.alpha.table import AlphaTablePrices
-from tba_invest_etl.domain_models.io import SQLParams
+from tbainvestetl.alpha.api import AlphaScraper
+from tbainvestetl.alpha.table import AlphaTablePrices
+from tbainvestetl.domain_models.io import SQLParams
 
 
 # Fixtures

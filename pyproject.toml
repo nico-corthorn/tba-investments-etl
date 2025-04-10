@@ -3,7 +3,7 @@ requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tba_invest_etl"
+name = "tbainvestetl"
 description = "A Python library to build a systematic ESG portfolio"
 authors = [
     {name = "Nicolas Corthorn", email = "nicolas.corthorn@gmail.com"}
@@ -19,14 +19,14 @@ classifiers = [
 dynamic = ["version", "readme"]
 
 [tool.setuptools.dynamic]
-version = {attr = "tba_invest_etl.__version__"}
+version = {attr = "tbainvestetl.__version__"}
 readme = {file = ["README.md", "LICENSE"]}
 
 [project.optional-dependencies]
 dev = []
 
 [tool.setuptools.packages.find]
-include = ["tba_invest_etl*"]
+include = ["tbainvestetl*"]
 where = ["."]
 exclude = ["examples*", "docs*"]
 

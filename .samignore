@@ -3,4 +3,4 @@
 **/.pytest_cache
 **/.ipynb_checkpoints
 tests/
-tba_invest_etl/db/notebooks
+tbainvestetl/db/notebooks

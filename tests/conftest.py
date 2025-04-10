@@ -10,8 +10,8 @@ import pytest
 from _pytest.config import Config
 from pytz import timezone
 
-from tba_invest_etl.domain_models.io import SQLParams, convert_dict_to_sql_params
-from tba_invest_etl.utils import aws, date_utils, sql_manager
+from tbainvestetl.domain_models.io import SQLParams, convert_dict_to_sql_params
+from tbainvestetl.utils import aws, date_utils, sql_manager
 
 # Set of fixture names that contain sensitive data
 SENSITIVE_FIXTURES = {"api_key", "sql_params", "sql"}

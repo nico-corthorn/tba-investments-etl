@@ -1,0 +1,136 @@
+
+from datetime import datetime
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import statsmodels.api as sm
+from dateutil.relativedelta import relativedelta
+from sklearn.linear_model import LinearRegression
+
+
+def plot_histogram(df, factors):
+    fig, ax = plt.subplots(1, len(factors), figsize=(20, 4))
+    for i, factor in enumerate(factors):
+        axi = ax[i]
+        axi.hist(df[factor], bins=100)
+        axi.set_xlabel(factor)
+        if i == 0:
+            axi.set_ylabel('Count')
+    plt.show()
+
+def post_process_factor_exposures(date_str, factors_to_log, factors_to_standardize, factors_flip_sign, sql):
+
+    # Retrive data
+    raw_factors = sql.select_query(f"select * from crsp_monthly_returns_factors where date='{date_str}'")
+
+    # Drop stocks with measing features
+    df_factors = raw_factors.dropna()
+
+    if df_factors.empty:
+        return None
+
+    # Compute weight
+    df_factors['weight'] = df_factors['size'] / df_factors['size'].sum()
+
+    # Log-transform
+    for factor in factors_to_log:
+        df_factors[factor] = np.log(df_factors[factor])
+
+    # Standardize
+    for factor in factors_to_standardize:
+        mu = np.average(df_factors[factor], weights=df_factors.weight)
+        sigma = np.sqrt(np.average((df_factors[factor] - mu )**2, weights=df_factors.weight))
+        df_factors[factor] = (df_factors[factor] - mu ) /sigma
+
+    # Flip signs
+    for factor in factors_flip_sign:
+        df_factors[factor] = -df_factors[factor]
+
+    # Special treatment for beta
+    factor = 'beta'
+    mu = np.average(df_factors[factor], weights=df_factors.weight)
+    df_factors[factor] = df_factors[factor] - (mu - 1)
+
+    return df_factors
+
+
+def get_regression_results(df_factors, factors):
+    y = df_factors.logret_1m
+    x = df_factors[factors]
+    w = df_factors.weight
+    model = sm.WLS(y, x, weights=w)
+    res = model.fit()
+    reg_results = pd.DataFrame({'coef': res.params, 'tstat': res.tvalues, 'pval': res.pvalues})
+    reg_results = reg_results.reset_index().rename(columns = {'index': 'factor'})
+    return res, reg_results
+
+
+def upload_scaled_factors_and_regression_results_date(date, sql):
+    date_str = date.strftime('%Y-%m-%d')
+
+    # Factor post-processing
+    factors_to_log = ['size']
+    factors_to_standardize = ['bm', 'size', 'mom', 'vol']
+    factors_flip_sign = ['size', 'vol']
+    df_factors = post_process_factor_exposures(date_str, factors_to_log, factors_to_standardize, factors_flip_sign, sql)
+
+    if df_factors is not None:
+        # Get regression results
+        factors = ['beta', 'bm', 'size', 'mom', 'vol']
+        res, reg_results = get_regression_results(df_factors, factors)
+
+        # Upload scaled factors
+        df_factors = df_factors.rename(columns={'size': 'small', 'vol': 'lowvol'})
+        sql.upload_df_chunks('crsp_monthly_returns_factors_sc', df_factors, chunk_size=100)
+
+        # Upload date
+        reg_results['date'] = date
+        reg_results = reg_results[['date', 'factor', 'coef', 'tstat', 'pval']]
+        sql.upload_df('reg_coefs', reg_results)
+
+        # Upload metrics
+        metrics = pd.DataFrame({'date': [date], 'metric': ['r2'], 'val': res.rsquared})
+        sql.upload_df('reg_metrics', metrics)
+
+
+def upload_scaled_factors_and_regression_results(sql, clean_tables=True):
+    # Clean
+    if clean_tables:
+        sql.clean_table('crsp_monthly_returns_factors_sc')
+        sql.clean_table('reg_coefs')
+        sql.clean_table('reg_metrics')
+
+    # Dates
+    query = f"select distinct date from crsp_monthly_returns_factors"
+    bdates = sql.select_query(query)
+    bdates = bdates.date.sort_values()
+
+    # Process all dates
+    for date in bdates:
+        print(date.strftime('%Y-%m-%d'), end='\r')
+        upload_scaled_factors_and_regression_results_date(date, sql)
+
+
+def plot_scatter(date, sql):
+
+    # Date
+    date_str = date.strftime('%Y-%m-%d')
+
+    # Process factors
+    factors = ['beta', 'bm', 'size', 'mom', 'vol']
+    factors_to_log = ['bm', 'size', 'vol']
+    factors_to_standardize = ['bm', 'size', 'mom', 'vol']
+    factors_flip_sign = ['size', 'vol']
+    df_factors = post_process_factor_exposures(date_str, factors_to_log, factors_to_standardize, factors_flip_sign, sql)
+
+    # Plot
+    fig, ax = plt.subplots(1, len(factors), figsize=(15, 4))
+    for i, factor in enumerate(factors):
+        axi = ax[i]
+        sns.regplot(factor, 'logret_1m', data=df_factors, scatter_kws={'alpha':0.3}, line_kws={'color': 'red'}, ax=axi)
+        axi.set_xlabel(factor)
+        if i != 0:
+            axi.set_ylabel('')
+    plt.show()

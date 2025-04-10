@@ -17,13 +17,13 @@ update-conda-env:
 	make install
 
 format:
-	black tba_invest_etl tests
-	isort tba_invest_etl tests
+	black tbainvestetl tests
+	isort tbainvestetl tests
 
 lint:
-	pylint tba_invest_etl tests --rcfile=.pylintrc
-	black --check --diff tba_invest_etl tests
-	isort --check-only tba_invest_etl tests
+	pylint tbainvestetl tests --rcfile=.pylintrc
+	black --check --diff tbainvestetl tests
+	isort --check-only tbainvestetl tests
 
 test:
 	python -m pytest -v
@@ -31,17 +31,43 @@ test:
 pre_pr: format lint test
 
 build-package:
-	@echo "Building tba_invest_etl package..."
+	@echo "Building tbainvestetl package..."  # Updated to match new name
 	rm -rf dist
 	mkdir -p dist
 	python setup.py sdist
-	mv dist/*.tar.gz dist/tba_invest_etl.tar.gz
+	mv dist/*.tar.gz dist/tbainvestetl.tar.gz  # Updated to match new name
 
-publish-package:
+publish-package-only:
+	make build-package
 	@echo "Publishing package to AWS CodeArtifact..."
 	python -m pip install --upgrade twine
 	aws codeartifact login --tool twine --domain tba-investments --domain-owner $(AWS_ACCOUNT_ID) --repository tba-investments-etl --region $(AWS_REGION)
-	python -m twine upload --repository codeartifact dist/* --skip-existing
+	python -m twine upload --repository codeartifact dist/*
+
+publish-package:
+	@echo "Checking if version already exists..."
+	if make publish-package-only; then \
+		echo "Upload successful."; \
+	else \
+		echo "Version conflict detected. Incrementing patch version..."; \
+		python -c 'import re; from tbainvestetl.version import __version__; major, minor, patch = map(int, __version__.split(".")); new_version = f"{major}.{minor}.{patch + 1}"; f = open("tbainvestetl/version.py", "w"); f.write(f"__version__ = \"{new_version}\"\n"); f.close()'; \
+		make publish-package-only; \
+	fi
+
+install-local:
+	@echo "Installing tbainvestetl locally..."
+	pip install dist/tbainvestetl.tar.gz \
+		--no-cache-dir \
+		--verbose \
+		--extra-index-url https://pypi.org/simple/
+
+upload-repository-policy:
+	@echo "Uploading repository permissions policy to CodeArtifact..."
+	aws codeartifact put-repository-permissions-policy \
+		--domain tba-investments \
+		--domain-owner 654580413909 \
+		--repository tba-investments-etl \
+		--policy-document file://repository-policy.json
 
 build-sam:
 	@echo "Cleaning previous build..."

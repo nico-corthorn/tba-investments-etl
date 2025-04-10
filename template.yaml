@@ -39,7 +39,7 @@ Resources:
   DependenciesLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      LayerName: tba_invest_etl-dependencies
+      LayerName: tbainvestetl-dependencies
       Description: Common dependencies for ESG Tools Lambda functions
       ContentUri: .aws-sam/build/PythonDependenciesLayer/
       CompatibleRuntimes:
@@ -121,7 +121,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: tba_invest_etl.lambdas.update_assets.lambda_handler
+      Handler: tbainvestetl.lambdas.update_assets.lambda_handler
       Role: arn:aws:iam::654580413909:role/LambdaSecretsManagerReadAccess
       Timeout: 600
       MemorySize: 500
@@ -132,7 +132,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: tba_invest_etl.lambdas.get_assets.lambda_handler
+      Handler: tbainvestetl.lambdas.get_assets.lambda_handler
       Role: arn:aws:iam::654580413909:role/LambdaSecretsManagerReadAccess
       Timeout: 300
       MemorySize: 500
@@ -143,7 +143,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: tba_invest_etl.lambdas.update_prices_alpha.lambda_handler
+      Handler: tbainvestetl.lambdas.update_prices_alpha.lambda_handler
       Role: arn:aws:iam::654580413909:role/LambdaSecretsManagerReadAccess
       Timeout: 900
       MemorySize: 1000
@@ -154,7 +154,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: tba_invest_etl.lambdas.update_prices_alpha_monthly.lambda_handler
+      Handler: tbainvestetl.lambdas.update_prices_alpha_monthly.lambda_handler
       Role: arn:aws:iam::654580413909:role/LambdaSecretsManagerReadAccess
       Timeout: 900
       MemorySize: 1000
@@ -165,7 +165,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: tba_invest_etl.lambdas.update_returns_monthly.lambda_handler
+      Handler: tbainvestetl.lambdas.update_returns_monthly.lambda_handler
       Role: arn:aws:iam::654580413909:role/LambdaSecretsManagerReadAccess
       Timeout: 300
       MemorySize: 500
@@ -176,7 +176,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: tba_invest_etl.lambdas.update_accounting.lambda_handler
+      Handler: tbainvestetl.lambdas.update_accounting.lambda_handler
       Role: arn:aws:iam::654580413909:role/LambdaSecretsManagerReadAccess
       Timeout: 900
       MemorySize: 1000
@@ -187,7 +187,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: tba_invest_etl.lambdas.update_nyt_articles.lambda_handler
+      Handler: tbainvestetl.lambdas.update_nyt_articles.lambda_handler
       Role: arn:aws:iam::654580413909:role/LambdaSecretsManagerReadAccess
       Timeout: 600
       MemorySize: 500
@@ -198,7 +198,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
-      Handler: tba_invest_etl.lambdas.update_nyt_links.lambda_handler
+      Handler: tbainvestetl.lambdas.update_nyt_links.lambda_handler
       Role: arn:aws:iam::654580413909:role/LambdaSecretsManagerReadAccess
       Timeout: 600
       MemorySize: 500

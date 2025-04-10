@@ -1,0 +1,14 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": [
+                "codeartifact:GetRepositoryEndpoint",
+                "codeartifact:ReadFromRepository"
+            ],
+            "Resource": "arn:aws:codeartifact:us-east-2:654580413909:repository/tba-investments/tba-investments-etl"
+        }
+    ]
+}

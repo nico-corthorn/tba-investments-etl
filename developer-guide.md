@@ -3,7 +3,7 @@
 We use AWS to host different resources, the main ones being:
 - RDS Postgres database: Hosts all investment data sources and various outputs.
 - Secrets Manager: Keeps database and stock price API credentials accesible and safe.
-- Lambda functions: Get assets ids, update prices, update news, etc. See /tba_invest_etl/lambdas and template.yaml.
+- Lambda functions: Get assets ids, update prices, update news, etc. See /tbainvestetl/lambdas and template.yaml.
 - Step functions: To orchestrate (and parallelize) lambda function execution. See /statemachines.
 
 

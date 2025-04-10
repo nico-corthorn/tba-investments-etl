@@ -140,13 +140,3 @@ dmypy.json
 # SAM
 samconfig.toml
 .aws-sam/
-
-# Data
-db/data/
-db/viewer.ipynb
-
-# WRDS solutions
-tba_invest_etl/wrds
-
-# Package duplicates
-tba_invest_etl/sentiment/inference_pipeline/tba_invest_etl
